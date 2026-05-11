@@ -3,11 +3,14 @@ package kubernetes.deployment
 # Default deny
 default allow = false
 
-# Allow if no violations
+# Allow if no violations exist
 allow {
-    count(violations) == 0
+    not has_violations
 }
 
+has_violations {
+    violations[_]
+}
 # Rule 1: Prevent running containers as root (security enforcement)
 violations[msg] {
     container := input.spec.template.spec.containers[_]
