@@ -1,0 +1,59 @@
+name: DevOps Automation CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  lint-scripts:
+    name: Lint Shell Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: './scripts'
+
+  opa-validation:
+    name: OPA Security Enforcement
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup OPA
+        uses: open-policy-agent/setup-opa@v2
+        with:
+          version: latest
+
+      - name: Run OPA Validation
+        run: |
+          echo "Evaluating Kubernetes deployment config against OPA policy..."
+          opa eval -i config/deployment.json -d policies/infrastructure.rego "data.kubernetes.deployment.allow" | grep "true"
+          echo "Validation Passed: No policy violations found."
+
+  sonarqube-analysis:
+    name: SonarQube Static Code Analysis
+    runs-on: ubuntu-latest
+    needs: [lint-scripts]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        # Note: Set up SONAR_TOKEN in your repository secrets and update sonar-project.properties with your organization key.
